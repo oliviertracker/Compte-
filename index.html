@@ -1,1 +1,183 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mon Budget - 2026</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f0f2f5; padding: 10px; margin: 0; }
+        .container { max-width: 500px; margin: 0 auto; }
+        
+        .header-status { background: white; border-radius: 15px; padding: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-bottom: 15px; text-align: center; }
+        #solde-reel { font-size: 1.8rem; font-weight: bold; color: #2e7d32; margin: 5px 0; }
+        
+        .mini-cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; margin-top: 10px; }
+        .cal-day { font-size: 0.65rem; padding: 5px; border: 1px solid #eee; border-radius: 4px; color: #ccc; }
+        .cal-active { border-color: #1976d2; color: #1976d2; font-weight: bold; background: #e3f2fd; }
+
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; margin-bottom: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #f0f0f0; font-size: 0.85rem; }
+        .pot-header { font-weight: bold; color: white; padding: 8px 10px; border-radius: 10px 10px 0 0; display: flex; justify-content: space-between; align-items: center; }
+        .pot2 { background: #fb8c00; } .pot3 { background: #8e24aa; } .pot4 { background: #2e7d32; }
+        
+        input[type="number"], input[type="text"] { border: 1px solid #ddd; border-radius: 4px; padding: 4px; font-size: 0.8rem; width: 100%; box-sizing: border-box; }
+        .in-date { width: 40px !important; text-align: center; } 
+        .in-prix { width: 70px !important; text-align: right; font-weight: bold; }
+        .in-label { border: none !important; background: transparent; font-weight: 500; }
+        
+        .checked-row { background-color: #f1f8e9; color: #999; }
+        .checked-row td { text-decoration: line-through; }
+        .checked-row input { opacity: 0.5; }
+        input[type="checkbox"] { width: 20px; height: 20px; cursor: pointer; }
+        
+        .btn-add { background: #4caf50; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-weight: bold; margin-bottom: 15px; }
+        .recap-final { background: #263238; color: white; padding: 15px; border-radius: 15px; text-align: center; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header-status">
+        <div style="font-size: 0.8rem; color: #666; text-transform: uppercase; letter-spacing: 1px;">Estimation Solde Compte</div>
+        <div id="solde-reel">0.00 €</div>
+        <div class="mini-cal" id="mini-cal"></div>
+    </div>
+
+    <table>
+        <tr style="background: #e8f5e9;">
+            <td><b>REVENUS (Salaire + Apport)</b></td>
+            <td style="text-align: right;"><input type="number" id="total_revenus" value="2100" oninput="calculer()" class="in-prix"> €</td>
+        </tr>
+    </table>
+
+    <div class="pot-header pot2">CHARGES FIXES <span><button class="btn-add" onclick="addRow('table-p2')">+</button></span></div>
+    <table id="table-p2"></table>
+
+    <div class="pot-header pot3">ÉPARGNE & INVESTISSEMENTS <span><button class="btn-add" onclick="addRow('table-p3')">+</button></span></div>
+    <table id="table-p3"></table>
+
+    <div class="pot-header pot4">DÉPENSES COURANTES <span><button class="btn-add" onclick="addRow('table-p4')">+</button></span></div>
+    <table id="table-p4"></table>
+
+    <div class="recap-final">
+        <div style="font-size: 0.9rem; opacity: 0.8;">RESTE À VIVRE RÉEL</div>
+        <div id="tot-reste" style="font-size: 1.5rem; font-weight: bold;">0.00 €</div>
+    </div>
+</div>
+
+<script>
+    const dataInitiales = {
+        'table-p2': [
+            {d: 5, n: "Free Mobile", v: 31.98},
+            {d: 5, n: "Free Telecom", v: 59.99},
+            {d: 5, n: "Assur. MMA", v: 69.05},
+            {d: 6, n: "Cotis. CIC", v: 13.35},
+            {d: 9, n: "Eau (Saur)", v: 19.19},
+            {d: 10, n: "Assur. Abeille", v: 25.16},
+            {d: 16, n: "HP Ink", v: 1.79},
+            {d: 18, n: "Amazon Prime", v: 6.99},
+            {d: 23, n: "Amazon Digital", v: 7.99}
+        ],
+        'table-p3': [
+            {d: 23, n: "Assur Vie (1)", v: 50.00},
+            {d: 23, n: "Assur Vie (2)", v: 50.00},
+            {d: 31, n: "Bitstack", v: 14.09}
+        ],
+        'table-p4': [
+            {d: "", n: "Leclerc", v: ""},
+            {d: "", n: "Divers", v: ""}
+        ]
+    };
+
+    function addRow(tableId, data = {d:"", n:"", v:""}) {
+        const table = document.getElementById(tableId);
+        const row = document.createElement('tr');
+        row.className = 'item-row';
+        row.innerHTML = `
+            <td><input type="checkbox" class="chk" onchange="calculer()"></td>
+            <td><input type="number" class="in-date" value="${data.d}" placeholder="J" oninput="calculer()"></td>
+            <td><input type="text" class="in-label" value="${data.n}" placeholder="Nom..." oninput="calculer()"></td>
+            <td><input type="number" class="in-prix" value="${data.v}" placeholder="0.00" oninput="calculer()"></td>
+        `;
+        table.appendChild(row);
+        calculer();
+    }
+
+    function calculer() {
+        let totalRev = parseFloat(document.getElementById('total_revenus').value) || 0;
+        let totalDepenses = 0;
+        let soldeEnBanque = totalRev;
+        let activeDates = [];
+
+        document.querySelectorAll('.item-row').forEach(row => {
+            let cb = row.querySelector('.chk');
+            let date = parseInt(row.querySelector('.in-date').value);
+            let prix = parseFloat(row.querySelector('.in-prix').value) || 0;
+            
+            totalDepenses += prix;
+
+            if (cb.checked) {
+                row.classList.add('checked-row');
+                soldeEnBanque -= prix;
+            } else {
+                row.classList.remove('checked-row');
+                if(date) activeDates.push(date);
+            }
+        });
+
+        document.getElementById('solde-reel').innerText = soldeEnBanque.toFixed(2) + " €";
+        document.getElementById('tot-reste').innerText = (totalRev - totalDepenses).toFixed(2) + " €";
+        updateMiniCal(activeDates);
+        save();
+    }
+
+    function updateMiniCal(activeDates) {
+        const cal = document.getElementById('mini-cal');
+        cal.innerHTML = "";
+        for(let i=1; i<=31; i++) {
+            let isActive = activeDates.includes(i);
+            cal.innerHTML += `<div class="cal-day ${isActive ? 'cal-active' : ''}">${i}</div>`;
+        }
+    }
+
+    function save() {
+        const tables = ['table-p2', 'table-p3', 'table-p4'];
+        const fullData = {};
+        tables.forEach(id => {
+            fullData[id] = Array.from(document.getElementById(id).querySelectorAll('.item-row')).map(row => ({
+                chk: row.querySelector('.chk').checked,
+                d: row.querySelector('.in-date').value,
+                n: row.querySelector('.in-label').value,
+                v: row.querySelector('.in-prix').value
+            }));
+        });
+        localStorage.setItem('budgetData_V2', JSON.stringify(fullData));
+        localStorage.setItem('budgetRev_V2', document.getElementById('total_revenus').value);
+    }
+
+    window.onload = function() {
+        const savedData = JSON.parse(localStorage.getItem('budgetData_V2'));
+        const savedRev = localStorage.getItem('budgetRev_V2');
+        
+        if(savedRev) document.getElementById('total_revenus').value = savedRev;
+
+        if(savedData) {
+            Object.keys(savedData).forEach(id => {
+                savedData[id].forEach(item => addRow(id, item));
+                // On réapplique l'état coché après création
+                const rows = document.getElementById(id).querySelectorAll('.item-row');
+                savedData[id].forEach((item, index) => {
+                    if(item.chk) rows[index].querySelector('.chk').checked = true;
+                });
+            });
+        } else {
+            Object.keys(dataInitiales).forEach(id => {
+                dataInitiales[id].forEach(item => addRow(id, item));
+            });
+        }
+        calculer();
+    }
+</script>
+</body>
+</html>
 
